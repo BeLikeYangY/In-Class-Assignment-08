@@ -6,6 +6,9 @@ import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -26,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
     private FirebaseAuth mAuth;
     private FirebaseAuth.AuthStateListener mAuthListener;
     private String TAG = "MainActivity";
+    private FirebaseDatabase database = FirebaseDatabase.getInstance();
+    private DatabaseReference myRef;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,42 +45,15 @@ public class MainActivity extends AppCompatActivity {
                 if (user != null) {
                     // User is signed in
                     Log.d(TAG, "onAuthStateChanged:signed_in:" + user.getUid());
-                    String uid = user.getUid();
-
-                    FirebaseDatabase database = FirebaseDatabase.getInstance();
-                    DatabaseReference myRef = database.getReference(uid).child("name");
-
-                    myRef.addValueEventListener(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot dataSnapshot) {
-                            // This method is called once with the initial value and again
-                            // whenever data at this location is updated.
-                            String value = dataSnapshot.getValue(String.class);
-
-                            TextView tv = (TextView)findViewById(R.id.displayName);
-
-                            if(value != null){
-                                tv.setText(value);
-                            } else {
-                                tv.setText(getResources().getString(R.string.error_massage));
-                            }
-
-                        }
-
-                        @Override
-                        public void onCancelled(DatabaseError error) {
-                            // Failed to read value
-                        }
-                    });
-                    // try to use the user uid to get data from the user branch in the database
-                    // and then display the info in the TextViews
+                    myRef = database.getReference(user.getUid());
+                    displayInfo();
                 } else {
                     // User is signed out
                     Log.d(TAG, "onAuthStateChanged:signed_out");
 
                     Intent intent = new Intent(MainActivity.this,LoginActivity.class);
                     startActivity(intent);
-                    // Use explicit intent to go to LoginActivity
+                    finish();
                 }
             }
         };
@@ -96,25 +74,61 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void setName(View v){
-        FirebaseDatabase database = FirebaseDatabase.getInstance();
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+    public void displayInfo(){
+        TextView nameF = (TextView)findViewById(R.id.nameField);
+        TextView ageF = (TextView)findViewById(R.id.ageField);
+        TextView genderF = (TextView)findViewById(R.id.genderField);
 
-        String uid = user.getUid();
-        DatabaseReference myRef = database.getReference(uid).child("name");
-
-        EditText name = (EditText)findViewById(R.id.name);
-        String str2 = name.getText().toString();
-        myRef.setValue(str2);
-
-        Toast t = Toast.makeText(this, "Name updated!", Toast.LENGTH_SHORT);
-        t.show();
+        updateField(nameF,"name");
+        updateField(ageF,"age");
+        updateField(genderF,"gender");
     }
 
-    public void logout(View v){
-        FirebaseAuth.getInstance().signOut();
 
-        Intent intent = new Intent(this,LoginActivity.class);
-        startActivity(intent);
+    public void updateField(final TextView filed, String key){
+        myRef.child(key).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                // This method is called once with the initial value and again
+                // whenever data at this location is updated.
+                String value = dataSnapshot.getValue(String.class);
+
+                if (value != null) {
+                    filed.setText(value);
+                } else {
+                    filed.setText(R.string.error_massage);
+                }
+
+                Log.d(TAG, "Value is: " + value);
+            }
+
+            @Override
+            public void onCancelled(DatabaseError error) {
+                // Failed to read value
+                Log.w(TAG, "Failed to read value.", error.toException());
+            }
+        });
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle item selection
+        switch (item.getItemId()) {
+            case R.id.logout:
+                mAuth.signOut();
+                return true;
+            case R.id.editProfile:
+                startActivity(new Intent(MainActivity.this, EditActivity.class));
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
+        }
     }
 }
